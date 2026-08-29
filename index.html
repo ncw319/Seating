@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黃楚標中學｜座位表製作工具</title>
+<style>
+  :root{
+    --blue:#1e5aa8;
+    --blue-light:#e8f0fb;
+    --border:#c9d6e8;
+    --bg:#f4f6fa;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:16px;
+    font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+    background:var(--bg);color:#222;
+  }
+  .wrap{max-width:1400px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px;color:var(--blue)}
+  .sub{font-size:13px;color:#666;margin-bottom:12px}
+
+  /* 控制列 */
+  .panel{
+    background:#fff;border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;margin-bottom:12px;
+    display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field label{font-size:12px;color:#555}
+  select,input[type=number]{
+    font-family:inherit;font-size:14px;padding:6px 8px;
+    border:1px solid var(--border);border-radius:6px;background:#fff;
+  }
+  input[type=number]{width:70px}
+  button{
+    font-family:inherit;font-size:14px;padding:7px 14px;cursor:pointer;
+    border:none;border-radius:6px;background:var(--blue);color:#fff;
+  }
+  button:hover{opacity:.9}
+  button.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+  button.warn{background:#b3541e}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+  .note{font-size:12px;color:#888;width:100%;margin-top:2px}
+  .note b{color:#b3541e}
+
+  /* 左側名單 + 右側座位表 */
+  .layout{display:flex;gap:14px;align-items:flex-start}
+  .side{
+    width:290px;flex:none;background:#fff;border:1px solid var(--border);
+    border-radius:10px;padding:10px 12px;
+  }
+  .side h3{
+    margin:0 0 2px;font-size:14px;color:var(--blue);
+  }
+  .side .hint{font-size:11px;color:#999;margin-bottom:8px}
+  .sideList{max-height:70vh;overflow:auto}
+  .srow{
+    display:flex;align-items:center;gap:6px;padding:3px 0;
+    border-bottom:1px dashed #eee;
+  }
+  .srow .no{width:26px;font-size:12px;color:#888;text-align:right;flex:none}
+  .srow .nm{width:104px;font-size:13px;flex:none;word-break:break-all}
+  .srow input{
+    flex:1;min-width:0;font-family:inherit;font-size:12px;padding:4px 6px;
+    border:1px solid var(--border);border-radius:5px;background:#fff;
+  }
+  .srow.un .nm{color:#b3541e}
+  .srow.un .no{color:#b3541e;font-weight:bold}
+
+  .main{flex:1;min-width:0}
+
+  /* 座位表標題 */
+  .chartTitle{
+    background:#fff;border:1px solid var(--border);border-radius:10px;
+    padding:10px 16px;margin-bottom:10px;text-align:center;
+  }
+  .chartTitle .cls{font-size:20px;font-weight:bold;color:var(--blue)}
+  .chartTitle .tutor{font-size:14px;color:#444;margin-top:2px}
+
+  /* 資訊列 */
+  .info{
+    display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;
+    font-size:13px;margin-bottom:10px;color:#444;
+  }
+  .info b{color:var(--blue)}
+  .unseated{color:#b3541e;font-size:13px;margin-bottom:8px}
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:#333;color:#fff;padding:9px 18px;border-radius:20px;
+    font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99;
+  }
+  .toast.show{opacity:1}
+
+  /* 座位表 */
+  #grid{display:flex;flex-direction:column;gap:10px;align-items:center;margin-bottom:14px}
+  .row{display:flex;gap:26px;align-items:stretch}
+  .rowLabel{
+    display:flex;align-items:center;font-size:11px;color:#999;
+    width:44px;justify-content:center;flex:none;
+  }
+  .pair{display:flex;gap:4px}
+  .seat{
+    width:118px;min-height:140px;background:#fff;border:2px solid var(--border);
+    border-radius:8px;padding:6px 4px;text-align:center;position:relative;
+    display:flex;flex-direction:column;justify-content:center;gap:2px;user-select:none;
+  }
+  .seat.filled{cursor:grab;border-color:var(--blue);background:var(--blue-light)}
+  .seat.filled:active{cursor:grabbing}
+  .seat.empty{background:#fafafa;color:#aaa;font-size:12px}
+  .photoBox{
+    width:48px;height:58px;margin:0 auto 1px;flex:none;
+    border:1px solid #d8d8d8;border-radius:4px;background:#fafafa;
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:#aaa;overflow:hidden;
+  }
+  .photoBox img{width:100%;height:100%;object-fit:cover;display:block}
+  .seat .name{font-size:14px;font-weight:bold;line-height:1.25;word-break:break-word}
+  .seat .name.long{font-size:11px;line-height:1.3}
+  .seat .no{font-size:12px;color:#555;font-weight:normal}
+  .seat .eng{font-size:12px;color:#3a6fb0;font-weight:bold;min-height:1em;word-break:break-word}
+  .seat.dragging{opacity:.35}
+  .seat.over{outline:3px dashed #ff8c00;outline-offset:-3px}
+
+  /* 前方（底部）：黑板 + 門口 */
+  .frontStrip{display:flex;align-items:center;gap:12px}
+  .board{
+    flex:1;text-align:center;background:#fff;border:1px dashed var(--border);
+    border-radius:8px;padding:8px 0;color:#777;font-size:13px;letter-spacing:6px;
+  }
+  .door{
+    font-family:inherit;font-size:13px;padding:8px 14px;cursor:pointer;
+    border:2px solid #b3541e;border-radius:8px;background:#fdf1e7;color:#b3541e;
+    white-space:nowrap;
+  }
+  .doorNote{font-size:11px;color:#b3541e;margin-top:4px;text-align:center}
+
+  /* 列印：A4 橫向、只印標題卡 + 座位表 + 黑板/門口（黑板固定在頁面最底部） */
+  @page{ size:A4 landscape; margin:8mm }
+  @media print{
+    body{
+      background:#fff;padding:0;
+      display:flex;flex-direction:column;min-height:100vh;
+    }
+    h1,.sub,.panel,.side,.info,.unseated,.toast,.doorNote,.overlay{display:none !important}
+    .layout{display:block;flex:1;display:flex;flex-direction:column}
+    .main{flex:1;display:flex;flex-direction:column}
+    #grid{display:flex;flex:1}
+    .chartTitle{border:none;padding:0 0 4mm}
+    .chartTitle .cls{font-size:16pt;color:#000}
+    .chartTitle .tutor{font-size:11pt;color:#000}
+    .frontStrip{margin-top:auto}
+    #grid{gap:3mm}
+    .row{gap:5mm}
+    .rowLabel{width:8mm;font-size:8pt;color:#000}
+    .pair{gap:2mm}
+    .seat{width:24mm;min-height:26mm;border:1px solid #999;border-radius:2mm;padding:1mm 0;background:#fff !important}
+    .photoBox{width:13mm;height:16mm;margin-bottom:1mm;border:1px solid #bbb;font-size:6pt;color:#888}
+    .photoBox img{object-fit:cover}
+    .seat .name{font-size:9pt;color:#000}
+    .seat .name.long{font-size:7pt}
+    .seat .eng{font-size:8pt;color:#000}
+    .board{border:1px solid #999;color:#000;font-size:10pt;padding:2mm 0}
+    .door{background:#fff !important;color:#000;border:1px solid #999;font-size:10pt;padding:2mm 4mm;white-space:nowrap}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>香港教育工作者聯會黃楚標中學</h1>
+  <div class="sub">座位表製作工具（座位以兩個一組併排）</div>
+
+  <div class="panel">
+    <div class="field">
+      <label>班別</label>
+      <select id="clsSel"><option value="">-- 選擇班別 --</option></select>
+    </div>
+    <div class="field">
+      <label>行數（前後，第 1 行最近黑板）</label>
+      <input type="number" id="rowsInp" min="1" max="12" value="5">
+    </div>
+    <div class="field">
+      <label>列數（每列 2 個座位一組）</label>
+      <input type="number" id="colsInp" min="1" max="8" value="3">
+    </div>
+    <div class="field">
+      <label>學號排列起點</label>
+      <select id="dirSel">
+        <option value="left">由左開始（左下起）</option>
+        <option value="right">由右開始（右下起）</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>您的稱呼（儲存時記錄）</label>
+      <input type="text" id="whoInp" maxlength="20" style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px">
+    </div>
+    <div class="btns">
+      <button id="genBtn">產生座位表</button>
+      <button id="resetBtn" class="warn">重設排列</button>
+      <button id="saveBtn">儲存至雲端</button>
+      <button id="loadBtn" class="ghost">重新整理</button>
+      <button id="exportBtn" class="ghost">匯出備份</button>
+      <button id="importBtn" class="ghost">匯入備份</button>
+      <button id="printBtn" class="ghost">列印</button>
+      <button id="adminBtn" class="ghost">管理員：更新名單</button>
+    </div>
+    <div class="note">
+      座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名）。需互聯網連線。
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="side">
+      <h3>學生名單</h3>
+      <div class="hint">英文名已預設為學生本名，可直接修改，即時顯示於座位</div>
+      <div class="sideList" id="sideList"></div>
+    </div>
+
+    <div class="main">
+      <div class="chartTitle" id="chartTitle" style="display:none">
+        <div class="cls" id="titleCls"></div>
+        <div class="tutor" id="titleTutor"></div>
+      </div>
+
+      <div class="info" id="info"></div>
+      <div class="unseated" id="unseated"></div>
+
+      <div id="grid"></div>
+
+      <div class="frontStrip">
+        <button class="door" id="doorBtn" title="點擊可切換門口位置">🚪 門口</button>
+        <div class="board">黑　板</div>
+      </div>
+      <div class="doorNote">
+        註：門口標記預設在<b>左方</b>，如課室門口實際在右方，請點擊「🚪 門口」移到右方（位置會隨座位表一併儲存）。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="adminOverlay">
+  <div class="modal" style="width:560px">
+    <h3>管理員：更新學生名單</h3>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">
+      貼上名單（REG_NO／班別／班號／中文姓名／英文姓名，tab 分隔）；相片 ID 表可留空（會保留雲端現有相片）。
+      座位以學籍號索引，更新名單<b>不會</b>影響各班已排座位；離校學生自動消失，新學生會標示為未排位。
+    </div>
+    <textarea id="rosterTxt" rows="7" style="width:100%;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;resize:vertical" placeholder="貼上名單 txt…"></textarea>
+    <textarea id="photoTxt" rows="5" style="width:100%;font-family:monospace;font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;resize:vertical" placeholder="貼上相片 ID txt（file-ID 學籍號）…"></textarea>
+    <div class="rowBtns">
+      <button class="ghost" id="adminCancel">取消</button>
+      <button id="adminUpload">上載至雲端</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInp" accept=".json,application/json" style="display:none">
+
+<script>
+/* ================= 學生名單（班號 = 陣列次序 + 1） ================= */
+var ROSTER = {};
+
+/* 學籍號 -> Google Drive 相片 file-ID（顯示時組合 uc?export=download&id=） */
+var PHOTOS = {};
+
+/* ================= 班主任 ================= */
+const TUTORS = {
+"1A":["羅英傑","曾恩歡"],"1B":["黃可晴","吳汶釗"],"1C":["唐威廉","文寶婷"],
+"1D":["麥宇軒","李潤彤"],"1E":["朱靄茵","Reena"],
+"2A":["洪旭陽","陳釧華"],"2B":["譚嘉茵","林煒峻"],"2C":["蘇小貞","麥健權"],
+"2E":["盧沃聯","鄧洛瑤"],
+"3A":["楊志宏","嚴楚喬"],"3B":["鄭幗芬","許勝紅"],"3C":["羅麗容","王晨"],
+"3D":["劉雋峰","駱縴彤"],"3E":["梁偉豪","黃天偉"],
+"4A":["范海宏","王粵"],"4B":["李婉婷","歐碩騫"],"4C":["吳可雅","董彥"],
+"4D":["周凝","曾慶峰"],"4E":["洪一豐","陳銳康"],
+"5A":["林柳如","伍卓威"],"5B":["吳啟光","區婉梅"],"5C":["高嘉彤","鄒浚杰"],
+"6A":["連詠文","林丹娜"],"6B":["陳茂雄","魏詩穎"],"6C":["莊學謙","張仁蓉"]
+};
+
+/* ================= 同步設定 ================= */
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8Eyl0BEJqtDgo_fzkFDQTMBtjQwL-mYo0Ik-81CyaUdYi7yPi1pKPGWHcS6Z64W9o/exec";
+const LS_PREFIX = "hkfew_seat_";
+
+/* ================= 狀態 ================= */
+let state = null;      // {cls,rows,cols,dir,door,seats:[學籍號|null],eng:{學籍號:自訂英文名},updatedAt,updatedBy}
+let dirty = false;      // 有未儲存的調動 / 英文名
+let dragFrom = null;
+let REGMAP = {};       // 學籍號 -> {e:[中文,英文,學籍號], no:班號}（render 時重建）
+
+const $ = id => document.getElementById(id);
+const clsSel=$("clsSel"), rowsInp=$("rowsInp"), colsInp=$("colsInp"),
+      dirSel=$("dirSel"), grid=$("grid"), info=$("info"),
+      unseatedEl=$("unseated"), toastEl=$("toast"),
+      sideList=$("sideList"), doorBtn=$("doorBtn"), whoInp=$("whoInp");
+
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>toastEl.classList.remove("show"), 2600);
+}
+function capacity(rows,cols){ return rows*cols*2; }
+function teacherName(){ return (whoInp.value||"").trim(); }
+
+/* ================= 名單工具（以學籍號為索引） ================= */
+function buildRegMap(cls){
+  REGMAP = {};
+  (ROSTER[cls]||[]).forEach((e,i)=>{ REGMAP[e[2]] = {e:e, no:i+1}; });
+}
+function regOf(cls, no){ const e=(ROSTER[cls]||[])[no-1]; return e ? e[2] : null; }
+
+/* 依學號產生預設座位：縱行次序（1 號後方是 2 號），由左下開始
+   seats 一維索引 = 邏輯行*perRow+行內位置；邏輯行 0 = 第 1 行 = 最近黑板（版面底部） */
+function genDefault(cls, rows, cols, dir){
+  const list = ROSTER[cls] || [];
+  const cap = capacity(rows, cols);
+  const seats = new Array(cap).fill(null);
+  const perRow = cols*2;
+  for(let k=0;k<Math.min(list.length,cap);k++){
+    const line = Math.floor(k/rows);          // 第幾條縱線（0 = 最左）
+    const lr = k % rows;                      // 邏輯行（0 = 第 1 行，最近黑板）
+    const phy = (dir==="right") ? (perRow-1-line) : line;   // 由右開始 = 鏡像縱線
+    seats[lr*perRow + phy] = list[k][2];
+  }
+  return seats;
+}
+function autoRowsCols(n){
+  let cols = 3;
+  let rows = Math.ceil(n/(cols*2));
+  while(rows>10 && cols<8){ cols++; rows = Math.ceil(n/(cols*2)); }
+  return {rows:Math.max(1,Math.min(12,rows)), cols};
+}
+
+/* ================= 版面 ================= */
+function render(){
+  if(!state){
+    grid.innerHTML=""; info.innerHTML=""; unseatedEl.innerHTML="";
+    sideList.innerHTML=""; $("chartTitle").style.display="none";
+    return;
+  }
+  const {cls,rows,cols,seats} = state;
+  buildRegMap(cls);
+  const perRow = cols*2;
+  grid.innerHTML = "";
+  /* 黑板在下方：第 1 行（邏輯行 0）排最底 */
+  for(let lr=rows-1; lr>=0; lr--){
+    const rowEl = document.createElement("div");
+    rowEl.className = "row";
+    const label = document.createElement("div");
+    label.className = "rowLabel";
+    label.textContent = "第"+(lr+1)+"行";
+    rowEl.appendChild(label);
+    for(let c=0;c<cols;c++){
+      const pair = document.createElement("div");
+      pair.className = "pair";
+      for(let s=0;s<2;s++){ pair.appendChild(makeSeat(lr*perRow + c*2 + s)); }
+      rowEl.appendChild(pair);
+    }
+    grid.appendChild(rowEl);
+  }
+  $("chartTitle").style.display = "";
+  $("titleCls").textContent = cls+" 座位表";
+  $("titleTutor").textContent = "班主任："+(TUTORS[cls]||[]).join("、");
+  doorBtn.style.order = (state.door==="right") ? "2" : "0";
+  renderSide();
+  updateInfo();
+}
+
+function makeSeat(idx){
+  const reg = state.seats[idx];
+  const st = reg ? REGMAP[reg] : null;
+  const el = document.createElement("div");
+  el.dataset.idx = idx;
+  if(reg && st){
+    const e = st.e;
+    el.className = "seat filled";
+    el.draggable = true;
+    /* 相片：Drive thumbnail 端點，三重後備；無 ID 或全部失敗顯示「未有相片」 */
+    const photoEl = document.createElement("div");
+    photoEl.className = "photoBox";
+    const pid = PHOTOS[String(reg).toUpperCase()];
+    if(pid){
+      const trySrc = [
+        "https://drive.google.com/thumbnail?id="+pid+"&sz=w400",
+        "https://lh3.googleusercontent.com/d/"+pid+"=w400",
+        "https://drive.google.com/uc?export=download&id="+pid
+      ];
+      let tryIdx = 0;
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.draggable = false;
+      img.alt = "學生相片";
+      img.addEventListener("error", ()=>{
+        tryIdx++;
+        if(tryIdx < trySrc.length){ img.src = trySrc[tryIdx]; }
+        else { photoEl.textContent = "未有相片"; }
+      });
+      img.src = trySrc[0];
+      photoEl.appendChild(img);
+    }else{
+      photoEl.textContent = "未有相片";
+    }
+    const displayName = e[0] || e[1] || reg;
+    const nameEl = document.createElement("div");
+    nameEl.className = "name" + (displayName.length>7 ? " long" : "");
+    nameEl.textContent = displayName+" ("+st.no+")";
+    const engEl = document.createElement("div");
+    engEl.className = "eng";
+    engEl.textContent = state.eng[reg] || e[1] || "";
+    el.appendChild(photoEl); el.appendChild(nameEl); el.appendChild(engEl);
+    el.title = "拖曳可調位";
+    el.addEventListener("dragstart", ev=>{
+      dragFrom = idx; el.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", String(idx));
+    });
+    el.addEventListener("dragend", ()=>{ el.classList.remove("dragging"); });
+  }else{
+    el.className = "seat empty";
+    el.textContent = "空位";
+    el.title = "可將學生拖曳至此";
+  }
+  el.addEventListener("dragover", ev=>{
+    ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; el.classList.add("over");
+  });
+  el.addEventListener("dragleave", ()=> el.classList.remove("over"));
+  el.addEventListener("drop", ev=>{
+    ev.preventDefault(); el.classList.remove("over");
+    if(dragFrom===null || dragFrom===idx) return;
+    const a = state.seats[dragFrom], b = state.seats[idx];
+    state.seats[dragFrom] = b; state.seats[idx] = a;
+    dirty = true; dragFrom = null;
+    render();
+  });
+  return el;
+}
+
+/* 左側學生名單（直接輸入英文名） */
+function renderSide(){
+  sideList.innerHTML = "";
+  if(!state) return;
+  const list = ROSTER[state.cls] || [];
+  const seated = new Set(state.seats.filter(Boolean));
+  list.forEach((entry,i)=>{
+    const reg = entry[2];
+    const name = entry[0] || entry[1];
+    const row = document.createElement("div");
+    row.className = "srow" + (seated.has(reg) ? "" : " un");
+    const noEl = document.createElement("span");
+    noEl.className = "no"; noEl.textContent = i+1;
+    const nmEl = document.createElement("span");
+    nmEl.className = "nm"; nmEl.textContent = name;
+    nmEl.title = name;
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.maxLength = 40;
+    inp.placeholder = "英文名";
+    inp.value = state.eng[reg] || entry[1] || "";
+    inp.addEventListener("input", ()=>{
+      const v = inp.value.trim();
+      state.eng[reg] = v;
+      dirty = true;
+      const si = state.seats.indexOf(reg);
+      if(si!==-1){
+        const engEl = grid.querySelector('.seat[data-idx="'+si+'"] .eng');
+        if(engEl) engEl.textContent = v || (entry[1]||"");
+      }
+    });
+    row.appendChild(noEl); row.appendChild(nmEl); row.appendChild(inp);
+    sideList.appendChild(row);
+  });
+}
+
+function updateInfo(){
+  const {cls,seats} = state;
+  const list = ROSTER[cls] || [];
+  const seated = new Set(seats.filter(Boolean));
+  const missing = [];
+  list.forEach((e,i)=>{ if(!seated.has(e[2])) missing.push((i+1)+(e[0]||e[1])); });
+  let html = "<span>學生 <b>"+list.length+"</b> 人</span>";
+  if(state.updatedAt){
+    html += "<span>雲端最後更新："+state.updatedAt+(state.updatedBy?"（"+state.updatedBy+"）":"")+"</span>";
+  }else{
+    html += "<span style='color:#b3541e'>尚未同步至雲端</span>";
+  }
+  info.innerHTML = html;
+  unseatedEl.textContent = missing.length
+    ? "⚠ 未排到座位的學生："+missing.join("、")+"（請增加行或列，橙色顯示於左側名單）" : "";
+}
+
+/* ================= 門口 ================= */
+doorBtn.addEventListener("click", ()=>{
+  if(!state) return;
+  state.door = (state.door==="right") ? "left" : "right";
+  dirty = true;
+  doorBtn.style.order = (state.door==="right") ? "2" : "0";
+  toast("門口已移至"+(state.door==="right"?"右":"左")+"方");
+});
+
+/* ================= 狀態正規化（相容舊紀錄） ================= */
+/* 新格式：seats 存學籍號字串、eng 以學籍號為鍵
+   舊格式（本機 localStorage / 舊匯出檔）：seats 存 {no,name}、eng 以班號為鍵 → 自動遷移 */
+function normalize(rec, cls){
+  const target = rec.cls || cls;
+  if(!ROSTER[target]) return null;
+  const out = {
+    cls: target,
+    rows: Math.min(12, Math.max(1, +rec.rows||5)),
+    cols: Math.min(8,  Math.max(1, +rec.cols||3)),
+    dir: (rec.dir==="right")?"right":"left",
+    door:(rec.door==="right")?"right":"left",
+    seats: [], eng: {},
+    updatedAt: rec.updatedAt||null, updatedBy: rec.updatedBy||null
+  };
+  const cap = capacity(out.rows, out.cols);
+  let seats = rec.seats || [];
+  if(seats.length > cap) seats = seats.slice(0, cap);
+  for(let i=0;i<cap;i++){
+    const s = seats[i];
+    let reg = null;
+    if(typeof s === "string"){ reg = s; }
+    else if(s && s.no){ reg = regOf(target, +s.no); }
+    out.seats.push(reg);
+  }
+  const eng = rec.eng || {};
+  for(const k in eng){
+    if(/^W\d+$/i.test(k)){ out.eng[k.toUpperCase()] = eng[k]; }
+    else { const r = regOf(target, +k); if(r) out.eng[r] = eng[k]; }
+  }
+  return out;
+}
+function applyState(s){
+  state = s; dirty = false;
+  rowsInp.value = s.rows; colsInp.value = s.cols; dirSel.value = s.dir;
+  render();
+}
+
+/* ================= 雲端同步 ================= */
+async function srvGet(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+async function srvPost(payload){
+  const r = await fetch(SCRIPT_URL, {
+    method:"POST",
+    headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify(payload)
+  });
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+
+/* 讀取班別座位表：雲端 → 本機離線備份 → 預設排列 */
+async function loadClass(cls){
+  if(!cls){ state=null; render(); return; }
+  localStorage.setItem(LS_PREFIX+"_cls", cls);
+  toast("載入中…");
+  try{
+    const res = await srvGet(SCRIPT_URL+"?action=load&cls="+cls);
+    if(res.ok && res.data){
+      const s = normalize(res.data, cls);
+      if(s){ applyState(s); toast("已載入雲端最新版"+(s.updatedAt?"（"+s.updatedAt+"）":"")); return; }
+    }
+  }catch(e){}
+  const raw = localStorage.getItem(LS_PREFIX+cls);
+  if(raw){
+    try{
+      const s = normalize(JSON.parse(raw), cls);
+      if(s){ applyState(s); toast("⚠ 離線：載入本機紀錄"); return; }
+    }catch(e){}
+  }
+  const n = (ROSTER[cls]||[]).length;
+  const rc = autoRowsCols(n);
+  applyState({cls, rows:rc.rows, cols:rc.cols, dir:dirSel.value, door:"left",
+              seats:genDefault(cls, rc.rows, rc.cols, dirSel.value),
+              eng:{}, updatedAt:null, updatedBy:null});
+  toast("已按學號產生座位表（儲存後會同步至雲端）");
+}
+
+/* 儲存：先寫本機備份，再同步雲端；有衝突會提示 */
+async function save(){
+  if(!state){ toast("沒有可儲存的座位表"); return; }
+  localStorage.setItem(LS_PREFIX+state.cls, JSON.stringify(state));
+  const payload = {action:"save", cls:state.cls, baseUpdated: state.updatedAt || null,
+    data:{rows:state.rows, cols:state.cols, dir:state.dir, door:state.door,
+          seats:state.seats, eng:state.eng, updatedBy: teacherName()||"同事"}};
+  toast("儲存中…");
+  try{
+    let res = await srvPost(payload);
+    if(res.conflict){
+      const t = (res.current && res.current.updatedAt) ? res.current.updatedAt : "";
+      if(confirm("⚠ 此座位表已被其他人更新過（雲端版本時間："+t+"）。\n\n按「確定」= 以您的版本覆蓋；\n按「取消」= 不儲存，可按「重新整理」載入最新版。")){
+        res = await srvPost({...payload, baseUpdated:null});
+      }else{
+        toast("未儲存"); return;
+      }
+    }
+    if(res.ok){
+      state.updatedAt = res.updatedAt;
+      state.updatedBy = payload.data.updatedBy;
+      dirty = false;
+      localStorage.setItem(LS_PREFIX+state.cls, JSON.stringify(state));
+      toast("已儲存至雲端 ✓");
+      updateInfo();
+    }else{
+      toast("儲存失敗："+(res.err||"未知錯誤"));
+    }
+  }catch(e){
+    toast("⚠ 無法連線，已僅存本機備份（下次連線可再儲存）");
+    dirty = false;
+  }
+}
+
+/* 雲端名單：啟動時自動載入，離線則沿用內嵌名單 */
+async function loadRoster(){
+  try{
+    const res = await srvGet(SCRIPT_URL+"?action=roster");
+    if(res.ok && res.data && res.data.students){
+      applyServerRoster(res.data);
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function applyServerRoster(d){
+  const groups = {};
+  for(const reg in d.students){
+    const s = d.students[reg];
+    if(!s || !s.cls) continue;
+    (groups[s.cls] = groups[s.cls]||[]).push({no:+s.no||99, cn:s.cn||"", en:s.en||"", reg:reg});
+  }
+  const roster = {};
+  for(const cls in groups){
+    groups[cls].sort((a,b)=>a.no-b.no);
+    roster[cls] = groups[cls].map(x=>[x.cn, x.en, x.reg]);
+  }
+  ROSTER = roster;
+  if(d.photos){
+    PHOTOS = {};
+    for(const r in d.photos) PHOTOS[r.toUpperCase()] = d.photos[r];
+  }
+  buildClassOptions();
+  if(state && ROSTER[state.cls]) render();
+}
+function buildClassOptions(){
+  const sel = clsSel.value;
+  clsSel.innerHTML = '<option value="">-- 選擇班別 --</option>';
+  Object.keys(ROSTER).sort((a,b)=> (parseInt(a,10)-parseInt(b,10)) || (a.slice(-1)<b.slice(-1)?-1:1))
+    .forEach(c=>{
+      const o = document.createElement("option");
+      o.value = c; o.textContent = c+"（"+ROSTER[c].length+" 人）";
+      clsSel.appendChild(o);
+    });
+  clsSel.value = sel;
+}
+
+/* ================= 管理員：更新名單 ================= */
+function parseRosterTxt(txt){
+  const students = {};
+  (txt||"").split(/\r?\n/).forEach(line=>{
+    const p = line.split("\t");
+    if(p.length>=5){
+      const reg = p[0].trim(), cls = p[1].trim();
+      if(/^W\d+$/i.test(reg) && /^\d[A-E]$/.test(cls)){
+        students[reg.toUpperCase()] = {cls:cls, no:parseInt(p[2],10)||0, cn:p[3].trim(), en:p[4].trim()};
+      }
+    }
+  });
+  return students;
+}
+function parsePhotoTxt(txt){
+  const photos = {};
+  (txt||"").split(/\r?\n/).forEach(line=>{
+    const p = line.trim().split(/\s+/);
+    if(p.length===2 && /^W\d+$/i.test(p[1])) photos[p[1].toUpperCase()] = p[0];
+  });
+  return photos;
+}
+$("adminBtn").addEventListener("click", ()=>{
+  $("rosterTxt").value=""; $("photoTxt").value="";
+  $("adminOverlay").classList.remove("hidden");
+});
+$("adminCancel").addEventListener("click", ()=>$("adminOverlay").classList.add("hidden"));
+$("adminOverlay").addEventListener("click", e=>{
+  if(e.target.id==="adminOverlay") e.target.classList.add("hidden");
+});
+$("adminUpload").addEventListener("click", async ()=>{
+  const students = parseRosterTxt($("rosterTxt").value);
+  if(!Object.keys(students).length){
+    toast("未讀到學生資料，請檢查名單格式（需 tab 分隔）"); return;
+  }
+  let photos = parsePhotoTxt($("photoTxt").value);
+  if(!Object.keys(photos).length){
+    try{
+      const r = await srvGet(SCRIPT_URL+"?action=roster");
+      if(r.ok && r.data && r.data.photos) photos = r.data.photos;
+    }catch(e){}
+  }
+  if(!confirm("確定上載？共 "+Object.keys(students).length+" 名學生，會覆蓋雲端現有名單。")) return;
+  toast("上載中…");
+  try{
+    const res = await srvPost({action:"roster", data:{students:students, photos:photos}});
+    if(res.ok){
+      applyServerRoster({students:students, photos:photos});
+      $("adminOverlay").classList.add("hidden");
+      toast("學生名單已更新至雲端 ✓");
+    }else{
+      toast("上載失敗："+(res.err||"未知錯誤"));
+    }
+  }catch(e2){ toast("無法連線，請檢查網絡"); }
+});
+
+/* ================= 匯出 / 匯入（本機備份用） ================= */
+$("exportBtn").addEventListener("click", ()=>{
+  if(!state){ toast("沒有可匯出的座位表"); return; }
+  const blob = new Blob([JSON.stringify({...state, savedAt:new Date().toISOString()}, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "座位表_"+state.cls+".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("已匯出備份檔");
+});
+$("importBtn").addEventListener("click", ()=> $("fileInp").click());
+$("fileInp").addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const fr = new FileReader();
+  fr.onload = ()=>{
+    try{
+      const rec = JSON.parse(fr.result);
+      const s = normalize(rec, rec.cls);
+      if(!s) throw 0;
+      clsSel.value = s.cls;
+      applyState(s);
+      toast("已匯入 "+s.cls+" 的座位表");
+    }catch(err){ toast("匯入失敗：檔案格式不正確"); }
+    e.target.value = "";
+  };
+  fr.readAsText(f);
+});
+
+/* ================= 其他按鈕 ================= */
+function generate(){
+  const cls = clsSel.value;
+  if(!cls){ toast("請先選擇班別"); return; }
+  const rows = Math.min(12, Math.max(1, +rowsInp.value||1));
+  const cols = Math.min(8,  Math.max(1, +colsInp.value||1));
+  rowsInp.value = rows; colsInp.value = cols;
+  if(dirty && !confirm("重新產生會重排座位（英文名會保留），確定繼續？")) return;
+  const door = state ? state.door : "left";
+  const eng = state ? state.eng : {};
+  const updated = state ? {updatedAt:state.updatedAt, updatedBy:state.updatedBy} : {updatedAt:null, updatedBy:null};
+  applyState({cls, rows, cols, dir:dirSel.value, door,
+              seats:genDefault(cls, rows, cols, dirSel.value), eng:eng, ...updated});
+  toast("已按學號重新排列（由"+(dirSel.value==="right"?"右":"左")+"下開始）");
+}
+$("genBtn").addEventListener("click", generate);
+$("resetBtn").addEventListener("click", ()=>{
+  if(!state){ toast("請先選擇班別"); return; }
+  if(!confirm("重設會按學號重新排列（英文名會保留），確定？")) return;
+  const {cls,rows,cols,door,eng,updatedAt,updatedBy} = state;
+  applyState({cls, rows, cols, dir:dirSel.value, door, eng, updatedAt, updatedBy,
+              seats:genDefault(cls, rows, cols, dirSel.value)});
+  toast("已重設排列");
+});
+$("saveBtn").addEventListener("click", save);
+$("loadBtn").addEventListener("click", ()=>{ if(clsSel.value) loadClass(clsSel.value); });
+$("printBtn").addEventListener("click", ()=>window.print());
+
+/* 列印前量度實際內容尺寸，放大／縮小至用盡整頁 A4 橫向 */
+function printScale(){
+  if(!state) return 1;
+  const PX_PER_MM = 96/25.4;
+  const availW = 279, availH = 188;
+  const rowsEls = document.querySelectorAll("#grid .row");
+  if(!rowsEls.length) return 1;
+  let wPx = 0;
+  rowsEls.forEach(r=>{ wPx = Math.max(wPx, r.offsetWidth); });
+  const hPx = grid.offsetHeight +
+              $("chartTitle").offsetHeight +
+              document.querySelector(".frontStrip").offsetHeight;
+  return Math.min(availW/(wPx/PX_PER_MM), availH/(hPx/PX_PER_MM), 4);
+}
+window.addEventListener("beforeprint", ()=>{
+  document.querySelector(".main").style.zoom = printScale();
+});
+window.addEventListener("afterprint", ()=>{
+  document.querySelector(".main").style.zoom = "";
+});
+
+/* 班別切換：自動讀取雲端最新版 */
+clsSel.addEventListener("change", ()=> loadClass(clsSel.value));
+
+/* 離開提示：有未儲存改動時提醒 */
+window.addEventListener("beforeunload", e=>{
+  if(dirty){ e.preventDefault(); e.returnValue = ""; }
+});
+
+/* 稱呼：記在 localStorage */
+whoInp.addEventListener("change", ()=>localStorage.setItem(LS_PREFIX+"_who", teacherName()));
+
+/* 初始化 */
+(function init(){
+  whoInp.value = localStorage.getItem(LS_PREFIX+"_who") || "";
+  buildClassOptions();
+  loadRoster().then(()=>{
+    const last = localStorage.getItem(LS_PREFIX+"_cls");
+    if(last && ROSTER[last]){ clsSel.value = last; loadClass(last); }
+  });
+})();
+
+</script>
+</body>
+</html>

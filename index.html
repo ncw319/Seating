@@ -120,6 +120,11 @@
   .seat .name.long{font-size:11px;line-height:1.3}
   .seat .no{font-size:12px;color:#555;font-weight:normal}
   .seat .eng{font-size:12px;color:#3a6fb0;font-weight:bold;min-height:1em;word-break:break-word}
+  /* 隱藏英文名時：相片及名字稍為放大 */
+  #grid.noeng .seat{width:150px;min-height:185px}
+  #grid.noeng .photoBox{width:100px;height:120px}
+  #grid.noeng .seat .name{font-size:17px}
+  #grid.noeng .seat .name.long{font-size:14px}
   .seat.dragging{opacity:.35}
   .seat.over{outline:3px dashed #ff8c00;outline-offset:-3px}
 
@@ -161,6 +166,10 @@
     .seat .name{font-size:9pt;color:#000}
     .seat .name.long{font-size:7pt}
     .seat .eng{font-size:8pt;color:#000}
+    #grid.noeng .seat{width:30mm;min-height:36mm}
+    #grid.noeng .photoBox{width:20mm;height:24mm}
+    #grid.noeng .seat .name{font-size:11pt}
+    #grid.noeng .seat .name.long{font-size:8.5pt}
     .board{border:1px solid #999;color:#000;font-size:10pt;padding:2mm 0}
     .door{background:#fff !important;color:#000;border:1px solid #999;font-size:10pt;padding:2mm 4mm;white-space:nowrap}
   }
@@ -201,8 +210,8 @@
     <div class="field">
       <label>座位顯示英文名</label>
       <select id="engSel">
+        <option value="hide">隱藏（預設）</option>
         <option value="show">顯示</option>
-        <option value="hide">隱藏</option>
       </select>
     </div>
     <div class="field">
@@ -343,6 +352,7 @@ function render(){
   const singleHere = (cols % 2 === 1);            // 單數列：有一個不配對座位
   const singleLeft = singleHere && state.single !== "right";
   const pairCount = Math.floor(cols/2);
+  grid.classList.toggle("noeng", state.showEng===false);   // 隱藏英文名時放大相片及名字
   grid.innerHTML = "";
   /* 黑板在下方：第 1 行（邏輯行 0）排最底 */
   for(let lr=rows-1; lr>=0; lr--){
@@ -531,7 +541,7 @@ function normalize(rec, cls){
     dir: (rec.dir==="right")?"right":"left",
     door:(rec.door==="right")?"right":"left",
     single:(rec.single==="right")?"right":"left",
-    showEng:(rec.showEng===false)?false:true,
+    showEng:(rec.showEng===true)?true:false,   // 預設隱藏（舊紀錄無此欄位 → 隱藏）
     v2: true,
     seats: [], eng: {},
     updatedAt: rec.updatedAt||null, updatedBy: rec.updatedBy||null

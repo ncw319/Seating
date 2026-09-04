@@ -199,6 +199,13 @@
       </select>
     </div>
     <div class="field">
+      <label>座位顯示英文名</label>
+      <select id="engSel">
+        <option value="show">顯示</option>
+        <option value="hide">隱藏</option>
+      </select>
+    </div>
+    <div class="field">
       <label>您的稱呼（儲存時記錄）</label>
       <input type="text" id="whoInp" maxlength="20" style="width:110px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px">
     </div>
@@ -212,7 +219,7 @@
       <button id="printBtn" class="ghost">列印</button>
     </div>
     <div class="note">
-      座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始；雙數列兩個座位一組，單數列請用「單座位在」選擇單座位放左或右。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名）。需互聯網連線。
+      座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始；雙數列兩個座位一組，單數列請用「單座位在」選擇單座位放左或右。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名），並可用「座位顯示英文名」切換座位上的英文名顯示／隱藏。需互聯網連線。
     </div>
   </div>
 
@@ -274,14 +281,14 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8Eyl0BEJqtDgo_fzkF
 const LS_PREFIX = "hkfew_seat_";
 
 /* ================= 狀態 ================= */
-let state = null;      // {cls,rows,cols,dir,door,seats:[學籍號|null],eng:{學籍號:自訂英文名},updatedAt,updatedBy}
+let state = null;      // {cls,rows,cols,dir,door,showEng,seats:[學籍號|null],eng:{學籍號:自訂英文名},updatedAt,updatedBy}
 let dirty = false;      // 有未儲存的調動 / 英文名
 let dragFrom = null;
 let REGMAP = {};       // 學籍號 -> {e:[中文,英文,學籍號], no:班號}（render 時重建）
 
 const $ = id => document.getElementById(id);
 const clsSel=$("clsSel"), rowsInp=$("rowsInp"), colsInp=$("colsInp"),
-      dirSel=$("dirSel"), singleSel=$("singleSel"), grid=$("grid"), info=$("info"),
+      dirSel=$("dirSel"), singleSel=$("singleSel"), engSel=$("engSel"), grid=$("grid"), info=$("info"),
       unseatedEl=$("unseated"), toastEl=$("toast"),
       sideList=$("sideList"), doorBtn=$("doorBtn"), whoInp=$("whoInp");
 
@@ -404,10 +411,14 @@ function makeSeat(idx){
     const nameEl = document.createElement("div");
     nameEl.className = "name" + (displayName.length>7 ? " long" : "");
     nameEl.textContent = displayName+" ("+st.no+")";
-    const engEl = document.createElement("div");
-    engEl.className = "eng";
-    engEl.textContent = state.eng[reg] || e[1] || "";
-    el.appendChild(photoEl); el.appendChild(nameEl); el.appendChild(engEl);
+    el.appendChild(photoEl); el.appendChild(nameEl);
+    /* 英文名：可由「座位顯示英文名」選項隱藏 */
+    if(state.showEng !== false){
+      const engEl = document.createElement("div");
+      engEl.className = "eng";
+      engEl.textContent = state.eng[reg] || e[1] || "";
+      el.appendChild(engEl);
+    }
     el.title = "拖曳可調位";
     el.addEventListener("dragstart", ev=>{
       dragFrom = idx; el.classList.add("dragging");
@@ -496,6 +507,15 @@ doorBtn.addEventListener("click", ()=>{
   toast("門口已移至"+(state.door==="right"?"右":"左")+"方");
 });
 
+/* ================= 英文名顯示切換 ================= */
+engSel.addEventListener("change", ()=>{
+  if(!state){ toast("請先選擇班別"); return; }
+  state.showEng = (engSel.value!=="hide");
+  dirty = true;
+  render();
+  toast(engSel.value==="hide" ? "座位已隱藏英文名" : "座位已顯示英文名");
+});
+
 /* ================= 狀態正規化（相容舊紀錄） ================= */
 /* 新格式：seats 存學籍號字串、eng 以學籍號為鍵
    舊格式（本機 localStorage / 舊匯出檔）：seats 存 {no,name}、eng 以班號為鍵 → 自動遷移 */
@@ -511,6 +531,7 @@ function normalize(rec, cls){
     dir: (rec.dir==="right")?"right":"left",
     door:(rec.door==="right")?"right":"left",
     single:(rec.single==="right")?"right":"left",
+    showEng:(rec.showEng===false)?false:true,
     v2: true,
     seats: [], eng: {},
     updatedAt: rec.updatedAt||null, updatedBy: rec.updatedBy||null
@@ -536,6 +557,7 @@ function applyState(s){
   state = s; dirty = false;
   rowsInp.value = s.rows; colsInp.value = s.cols;
   dirSel.value = s.dir; singleSel.value = (s.single==="right")?"right":"left";
+  engSel.value = (s.showEng===false)?"hide":"show";
   render();
 }
 
@@ -577,7 +599,7 @@ async function loadClass(cls){
   const n = (ROSTER[cls]||[]).length;
   const rc = autoRowsCols(n);
   applyState({cls, rows:rc.rows, cols:rc.cols, dir:dirSel.value, door:"left",
-              single:singleSel.value, v2:true,
+              single:singleSel.value, showEng:(engSel.value!=="hide"), v2:true,
               seats:genDefault(cls, rc.rows, rc.cols, dirSel.value),
               eng:{}, updatedAt:null, updatedBy:null});
   toast("已按學號產生座位表（儲存後會同步至雲端）");
@@ -589,7 +611,7 @@ async function save(){
   localStorage.setItem(LS_PREFIX+state.cls, JSON.stringify(state));
   const payload = {action:"save", cls:state.cls, baseUpdated: state.updatedAt || null,
     data:{rows:state.rows, cols:state.cols, dir:state.dir, door:state.door,
-          single:state.single, v2:true,
+          single:state.single, showEng:(state.showEng!==false), v2:true,
           seats:state.seats, eng:state.eng, updatedBy: teacherName()||"同事"}};
   toast("儲存中…");
   try{
@@ -700,8 +722,9 @@ function generate(){
   if(dirty && !confirm("重新產生會重排座位（英文名會保留），確定繼續？")) return;
   const door = state ? state.door : "left";
   const eng = state ? state.eng : {};
+  const showEng = state ? (state.showEng!==false) : (engSel.value!=="hide");
   const updated = state ? {updatedAt:state.updatedAt, updatedBy:state.updatedBy} : {updatedAt:null, updatedBy:null};
-  applyState({cls, rows, cols, dir:dirSel.value, door, single:singleSel.value, v2:true,
+  applyState({cls, rows, cols, dir:dirSel.value, door, single:singleSel.value, showEng, v2:true,
               seats:genDefault(cls, rows, cols, dirSel.value), eng:eng, ...updated});
   toast("已按學號重新排列（由"+(dirSel.value==="right"?"右":"左")+"下開始）");
 }
@@ -710,7 +733,8 @@ $("resetBtn").addEventListener("click", ()=>{
   if(!state){ toast("請先選擇班別"); return; }
   if(!confirm("重設會按學號重新排列（英文名會保留），確定？")) return;
   const {cls,rows,cols,door,eng,updatedAt,updatedBy} = state;
-  applyState({cls, rows, cols, dir:dirSel.value, door, single:singleSel.value, v2:true,
+  applyState({cls, rows, cols, dir:dirSel.value, door, single:singleSel.value,
+              showEng:(state.showEng!==false), v2:true,
               eng, updatedAt, updatedBy,
               seats:genDefault(cls, rows, cols, dirSel.value)});
   toast("已重設排列");

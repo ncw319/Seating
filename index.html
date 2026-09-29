@@ -271,6 +271,89 @@ var ROSTER = {};
 /* 學籍號 -> Google Drive 相片 file-ID（顯示時組合 uc?export=download&id=） */
 var PHOTOS = {};
 
+/* ===== 應用學習班（外加名單，2026-09 新增） =====
+   這 4 班不進雲端名單試算表：後端名單以學籍號為唯一鍵，
+   若同學籍號出現兩次會覆蓋其常規班（1A-6C）資料。
+   此處按班分組儲存，與常規班互不影響；班號 = 名單次序。
+   姓名取自 2026-09 雲端名單；日後改名請改此處。 */
+var EXTRA_ROSTER = {
+"日語班":[
+["賴婥琳","LAI CHEUK LAM","W20221038"],
+["袁詠心","YUEN WING SUM","W20221063"],
+["張泳檸","CHEUNG WING NING","W20221034"],
+["洪正熹","HUNG CHING HEI ELVIS","W20221070"],
+["梁林峰","LEUNG LAM FUNG","W20221075"],
+["李詠詩","RAZA AASHA","W20211069"],
+["翁夢淇","WENG MENGQI","W20221031"],
+["吳承東","WU CHENG DONG","W20221011"],
+["熊永晟","XIONG YONG SHENG","W20211082"],
+["俞凱文","YU KAIWEN","W20221062"],
+["高婧","GAO CHING","W20221003"],
+["雄萬寧","XIONG WAN NING","W20221029"],
+["周麗埼","ZHOU LAI KI","W20221095"]
+],
+"甜品班":[
+["黃寶文","HUANG BAO WEN JACK","W20211031"],
+["彭曦穎","PENG HEI WING JUDY","W20221009"],
+["王晴怡","WONG CHING YI","W20221081"],
+["吳浩源","WU HO YUEN","W20221096"],
+["熊永昶","XIONG YONG CHANG","W20211081"],
+["張遠玖","ZHANG JACKIE","W20221013"],
+["張雅雯","ZHANG RAIN","W20221064"],
+["周小月","ZHOU SIU YUET","W20221067"],
+["朱瑋博","CHU WAI POK","W20221100"],
+["胡騰峰","HU TENGFENG","W20232002"],
+["劉舒妍","LAU SHU YIN","W20221074"],
+["劉芷伶","LIU ZHI LING","W20221097"],
+["盧芷昕","LO TSZ YAN","W20221057"],
+["鄧雅文","TANG NGA MAN","W20221080"],
+["李鶴宏","LI HEHONG","W20221089"],
+["凌婭瑋","LING A WAI","W20221091"],
+["劉俊傑","LIU CHUN KIT","W20221023"],
+["盧時興","LU SHIXING","W20243005"],
+["趙子愷","ZHAO TSZ HOI","W20221084"]
+],
+"無人機班":[
+["陳筱嵐","CHAN SIU NAM","W20221032"],
+["簡富順","JIAN FUSHUN","W20221071"],
+["林靄","LAM OI","W20221039"],
+["劉宜松","LAU YI CHUNG","W20211040"],
+["李雪喬","LEE SUET KIU","W20221052"],
+["楊子傑","SHAH MUHAMMAD AYAAN","W20211070"],
+["奧蘇衡","UMAR SUBHAN","W20211075"],
+["王寶俊","WANG PO CHUN","W20221028"],
+["王嘉淇","WONG KA KI","W20221093"],
+["陳孝佳","CHEN HAU KAI","W20221086"],
+["李思敏","KHAN ASMA","W20221046"],
+["劉聲洲","LIU SHENGZHOU","W20221043"],
+["陳澤森","CHEN JASENG","W20221001"],
+["梁泰瑋","LIANG TAIWEI DAVID","W20221006"]
+],
+"數碼班":[
+["張泳桐","CHEUNG WING TUNG","W20221035"],
+["郭鎧誠","GUO HOI SHING","W20211025"],
+["林溢峰","LAM YAT FUNG","W20221073"],
+["羅向晴","LAW HEUNG CHING","W20221051"],
+["廖文瑾","LIAO MAN KAN","W20221022"],
+["楊金圓","YANG JINYUAN","W20221045"],
+["莊錦豪","ZHUANG KAM HO","W20221101"],
+["區有悕","AU YAU HEI","W20221085"],
+["陳烈雄","CHAN LIT HUNG JACKY","W20221015"],
+["陳曦","CHEN KOOWA","W20221099"],
+["陳映朱","CHEN YING CHU","W20221002"],
+["馮浚賢","FENG TSUN YIN","W20221036"],
+["李堉洲","LI YUZHOU","W20221054"],
+["廖文瑜","LIAO MAN YU","W20221055"],
+["鄧進業","TANG CHUN YIP","W20221027"],
+["唐嘉俊","TANG KA CHUN","W20221059"],
+["王澤升","WONG CHAK SING","W20221092"]
+]
+};
+/* 合併外加名單（雲端已有同班別時以雲端為準） */
+function mergeExtraRoster(){
+  for(var c in EXTRA_ROSTER){ if(!ROSTER[c]) ROSTER[c] = EXTRA_ROSTER[c]; }
+}
+
 /* ================= 班主任 ================= */
 const TUTORS = {
 "1A":["羅英傑","曾恩歡"],"1B":["黃可晴","吳汶釗"],"1C":["唐威廉","文寶婷"],
@@ -674,6 +757,7 @@ function applyServerRoster(d){
     roster[cls] = groups[cls].map(x=>[x.cn, x.en, x.reg]);
   }
   ROSTER = roster;
+  mergeExtraRoster();   /* 應用學習班：合併外加名單 */
   if(d.photos){
     PHOTOS = {};
     for(const r in d.photos) PHOTOS[r.toUpperCase()] = d.photos[r];
@@ -787,6 +871,7 @@ whoInp.addEventListener("change", ()=>localStorage.setItem(LS_PREFIX+"_who", tea
 
 /* 初始化 */
 (function init(){
+  mergeExtraRoster();   /* 應用學習班：離線時外加名單仍可用 */
   whoInp.value = localStorage.getItem(LS_PREFIX+"_who") || "";
   buildClassOptions();
   loadRoster().then(()=>{

@@ -251,7 +251,7 @@
     </div>
     <div class="note">
       座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始；雙數列兩個座位一組，單數列請用「單座位在」選擇單座位放左或右。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名），並可用「座位顯示英文名」切換座位上的英文名顯示／隱藏。需互聯網連線。<br>
-      <b>插班生</b>：新加入名單的學生會自動出現在左下「<b>待入座學生</b>」，拖曳方格到空位即可入座（拖到已有學生的座位即對調）；座位不足時，直接修改<b>行數／列數</b>即時加位，原有座位保留。<b>退學／轉班</b>：如座位上的學生已不在最新名單，資訊列會有橙色提示，該座位以橙色顯示「不在名單」，可把新學生拖到該座取代，或拖回「待入座學生」移除。
+      <b>插班生</b>：新加入名單的學生會自動出現在左下「<b>待入座學生</b>」，拖曳方格到空位即可入座（拖到已有學生的座位即對調）；座位不足時，直接修改<b>行數／列數</b>即時加位，原有座位保留。<b>退學／轉班</b>：如座位上的學生已不在最新名單，資訊列會有橙色提示，該座位以橙色顯示「不在名單」，可把新學生拖到該座取代，或拖回「待入座學生」移除。座位表太寬時會<b>自動縮小</b>以配合螢幕，不會溢出。
     </div>
   </div>
 
@@ -456,6 +456,7 @@ function render(){
     grid.innerHTML=""; info.innerHTML=""; unseatedEl.innerHTML="";
     sideList.innerHTML=""; $("chartTitle").style.display="none";
     renderTray();
+    fitScreen();
     return;
   }
   const {cls,rows,cols,seats} = state;
@@ -494,6 +495,7 @@ function render(){
   renderSide();
   renderTray();
   updateInfo();
+  fitScreen();
 }
 
 function makeSeat(idx){
@@ -999,11 +1001,26 @@ function printScale(){
               document.querySelector(".frontStrip").offsetHeight;
   return Math.min(availW/(wPx/PX_PER_MM), availH/(hPx/PX_PER_MM), 4);
 }
+/* 螢幕自動縮放：座位表太寬時（例如隱藏英文名後座位放大、列數較多、
+   或螢幕較窄），自動縮小至剛好放進可用寬度，避免溢出右邊 */
+function fitScreen(){
+  const main = document.querySelector(".main");
+  if(!state){ main.style.zoom = ""; return; }
+  main.style.zoom = "";                                   /* 先還原才量度真實寬度 */
+  let w = 0;
+  document.querySelectorAll("#grid .row").forEach(r=>{ w = Math.max(w, r.offsetWidth); });
+  const avail = main.clientWidth;
+  main.style.zoom = (w > 0 && w > avail) ? Math.max(0.35, avail/w) : "";
+}
+window.addEventListener("resize", ()=>{ if(state) fitScreen(); });
+
 window.addEventListener("beforeprint", ()=>{
-  document.querySelector(".main").style.zoom = printScale();
+  const main = document.querySelector(".main");
+  main.style.zoom = "";                                   /* 先還原螢幕縮放才量度 */
+  main.style.zoom = printScale();
 });
 window.addEventListener("afterprint", ()=>{
-  document.querySelector(".main").style.zoom = "";
+  fitScreen();                                            /* 列印後還原螢幕縮放 */
 });
 
 /* 班別切換：自動讀取雲端最新版 */

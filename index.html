@@ -55,7 +55,7 @@
     margin:0 0 2px;font-size:14px;color:var(--blue);
   }
   .side .hint{font-size:11px;color:#999;margin-bottom:8px}
-  .sideList{max-height:70vh;overflow:auto}
+  .sideList{max-height:50vh;overflow:auto}
   .srow{
     display:flex;align-items:center;gap:6px;padding:3px 0;
     border-bottom:1px dashed #eee;
@@ -127,6 +127,28 @@
   #grid.noeng .seat .name.long{font-size:14px}
   .seat.dragging{opacity:.35}
   .seat.over{outline:3px dashed #ff8c00;outline-offset:-3px}
+  /* 幽靈座位：紀錄有此學生，但最新名單沒有（可能已退學／轉班） */
+  .seat.ghost{border-color:#b3541e;background:#fdf1e7;color:#b3541e;cursor:grab}
+  .seat.ghost:active{cursor:grabbing}
+  .seat.ghost .gname{font-size:13px;font-weight:bold;line-height:1.3}
+  .seat.ghost .greg{font-size:11px;word-break:break-all}
+
+  /* 待入座學生（名單之下）：方格可拖曳到座位；拖座位上的學生回此區可移出座位 */
+  .trayWrap{margin-top:10px;border-top:2px solid var(--border);padding-top:8px}
+  .trayWrap h3{color:#b3541e}
+  .tray{
+    display:flex;flex-wrap:wrap;gap:6px;max-height:22vh;overflow:auto;
+    padding:4px;border-radius:6px;
+  }
+  .tray.over{outline:3px dashed #ff8c00;outline-offset:-3px;background:#fff7ef}
+  .trayCard{
+    border:2px dashed #b3541e;border-radius:6px;background:#fdf1e7;color:#b3541e;
+    font-size:12px;font-weight:bold;padding:5px 8px;cursor:grab;user-select:none;
+    line-height:1.3;text-align:center;
+  }
+  .trayCard:active{cursor:grabbing}
+  .trayCard.dragging{opacity:.35}
+  .trayEmpty{font-size:11px;color:#999;padding:2px}
 
   /* 前方（底部）：黑板 + 門口 */
   .frontStrip{display:flex;align-items:center;gap:12px}
@@ -228,7 +250,8 @@
       <button id="printBtn" class="ghost">列印</button>
     </div>
     <div class="note">
-      座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始；雙數列兩個座位一組，單數列請用「單座位在」選擇單座位放左或右。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名），並可用「座位顯示英文名」切換座位上的英文名顯示／隱藏。需互聯網連線。
+      座位預設沿縱行排列（1 號後方是 2 號，數完一行才到旁邊），由左下開始；雙數列兩個座位一組，單數列請用「單座位在」選擇單座位放左或右。選班後<b>自動讀取雲端最新版</b>；儲存後其他同事按「重新整理」即見最新。英文名請在<b>左側名單</b>直接輸入（已預設本名），並可用「座位顯示英文名」切換座位上的英文名顯示／隱藏。需互聯網連線。<br>
+      <b>插班生</b>：新加入名單的學生會自動出現在左下「<b>待入座學生</b>」，拖曳方格到空位即可入座（拖到已有學生的座位即對調）；座位不足時，直接修改<b>行數／列數</b>即時加位，原有座位保留。<b>退學／轉班</b>：如座位上的學生已不在最新名單，資訊列會有橙色提示，該座位以橙色顯示「不在名單」，可把新學生拖到該座取代，或拖回「待入座學生」移除。
     </div>
   </div>
 
@@ -237,6 +260,11 @@
       <h3>學生名單</h3>
       <div class="hint">英文名已預設為學生本名，可直接修改，即時顯示於座位</div>
       <div class="sideList" id="sideList"></div>
+      <div class="trayWrap" id="trayWrap" style="display:none">
+        <h3>待入座學生</h3>
+        <div class="hint">拖曳方格到空位入座；拖到已有學生的座位即對調。將座位上的學生拖回此處可移出座位。</div>
+        <div class="tray" id="tray"></div>
+      </div>
     </div>
 
     <div class="main">
@@ -427,6 +455,7 @@ function render(){
   if(!state){
     grid.innerHTML=""; info.innerHTML=""; unseatedEl.innerHTML="";
     sideList.innerHTML=""; $("chartTitle").style.display="none";
+    renderTray();
     return;
   }
   const {cls,rows,cols,seats} = state;
@@ -463,6 +492,7 @@ function render(){
   $("titleTutor").textContent = "班主任："+(TUTORS[cls]||[]).join("、");
   doorBtn.style.order = (state.door==="right") ? "2" : "0";
   renderSide();
+  renderTray();
   updateInfo();
 }
 
@@ -512,13 +542,29 @@ function makeSeat(idx){
       engEl.textContent = state.eng[reg] || e[1] || "";
       el.appendChild(engEl);
     }
-    el.title = "拖曳可調位";
+    el.title = "拖曳可調位；拖回左下「待入座學生」可移出座位";
     el.addEventListener("dragstart", ev=>{
       dragFrom = idx; el.classList.add("dragging");
       ev.dataTransfer.effectAllowed = "move";
       ev.dataTransfer.setData("text/plain", String(idx));
     });
-    el.addEventListener("dragend", ()=>{ el.classList.remove("dragging"); });
+    el.addEventListener("dragend", ()=>{ el.classList.remove("dragging"); dragFrom = null; });
+  }else if(reg && !st){
+    /* 幽靈座位：紀錄有此學籍號，但最新名單沒有（可能已退學／轉班） */
+    el.className = "seat ghost";
+    el.draggable = true;
+    const g1 = document.createElement("div");
+    g1.className = "gname"; g1.textContent = "⚠ 不在名單";
+    const g2 = document.createElement("div");
+    g2.className = "greg"; g2.textContent = reg;
+    el.appendChild(g1); el.appendChild(g2);
+    el.title = "此學籍號不在最新名單（可能已退學／轉班）。可把新學生拖到此座取代，或拖回左下「待入座學生」移除。";
+    el.addEventListener("dragstart", ev=>{
+      dragFrom = idx; el.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", String(idx));
+    });
+    el.addEventListener("dragend", ()=>{ el.classList.remove("dragging"); dragFrom = null; });
   }else{
     el.className = "seat empty";
     el.textContent = "空位";
@@ -531,8 +577,13 @@ function makeSeat(idx){
   el.addEventListener("drop", ev=>{
     ev.preventDefault(); el.classList.remove("over");
     if(dragFrom===null || dragFrom===idx) return;
-    const a = state.seats[dragFrom], b = state.seats[idx];
-    state.seats[dragFrom] = b; state.seats[idx] = a;
+    if(typeof dragFrom === "string" && dragFrom.charAt(0)==="T"){
+      /* 從「待入座學生」拖入：放到此座；如已有學生（或不在名單的學籍號）則自動退下 */
+      state.seats[idx] = dragFrom.slice(1);
+    }else{
+      const a = state.seats[dragFrom], b = state.seats[idx];
+      state.seats[dragFrom] = b; state.seats[idx] = a;
+    }
     dirty = true; dragFrom = null;
     render();
   });
@@ -574,6 +625,58 @@ function renderSide(){
   });
 }
 
+/* 名單之下：待入座學生（在名單但未排座位，例如新插班），方格可拖曳入座 */
+function renderTray(){
+  const wrap = $("trayWrap"), tray = $("tray");
+  tray.innerHTML = "";
+  if(!state){ wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  const seated = new Set(state.seats.filter(Boolean));
+  const waiting = (ROSTER[state.cls]||[]).filter(e => !seated.has(e[2]));
+  waiting.forEach(entry=>{
+    const reg = entry[2];
+    const st = REGMAP[reg];
+    const card = document.createElement("div");
+    card.className = "trayCard";
+    card.draggable = true;
+    card.textContent = (entry[0]||entry[1]||reg) + (st ? " ("+st.no+")" : "");
+    card.title = "拖曳到座位表的空位入座；拖到已有學生的座位即對調";
+    card.addEventListener("dragstart", ev=>{
+      dragFrom = "T"+reg;   /* 字首 T 表示來自待入座區 */
+      card.classList.add("dragging");
+      ev.dataTransfer.effectAllowed = "move";
+      ev.dataTransfer.setData("text/plain", reg);
+    });
+    card.addEventListener("dragend", ()=>{ card.classList.remove("dragging"); dragFrom = null; });
+    tray.appendChild(card);
+  });
+  if(!waiting.length){
+    const d = document.createElement("div");
+    d.className = "trayEmpty";
+    d.textContent = "全部學生已入座。將座位上的學生拖回此處，可暫時移出座位。";
+    tray.appendChild(d);
+  }
+}
+/* 待入座區作為放置目標：把座位上的學生拖回此處 = 移出座位（不在名單的學籍號則移除） */
+$("trayWrap").addEventListener("dragover", ev=>{
+  if(dragFrom===null) return;
+  ev.preventDefault(); ev.dataTransfer.dropEffect = "move";
+  $("tray").classList.add("over");
+});
+$("trayWrap").addEventListener("dragleave", ()=> $("tray").classList.remove("over"));
+$("trayWrap").addEventListener("drop", ev=>{
+  ev.preventDefault(); $("tray").classList.remove("over");
+  if(typeof dragFrom === "number"){
+    const reg = state.seats[dragFrom];
+    state.seats[dragFrom] = null;
+    dirty = true; dragFrom = null;
+    render();
+    toast(REGMAP[reg] ? "已移出座位（學生列入待入座）" : "已移除不在名單的學籍號 "+reg);
+  }else{
+    dragFrom = null;
+  }
+});
+
 function updateInfo(){
   const {cls,seats} = state;
   const list = ROSTER[cls] || [];
@@ -581,6 +684,18 @@ function updateInfo(){
   const missing = [];
   list.forEach((e,i)=>{ if(!seated.has(e[2])) missing.push((i+1)+(e[0]||e[1])); });
   let html = "<span>學生 <b>"+list.length+"</b> 人</span>";
+  /* 退學／轉班預警：座位表紀錄有、但最新名單沒有的學籍號 */
+  const unknown = [];
+  seats.forEach((reg,idx)=>{
+    if(reg && !REGMAP[reg]){
+      unknown.push(reg+"（第"+(Math.floor(idx/state.cols)+1)+"行第"+(idx%state.cols+1)+"座）");
+    }
+  });
+  if(unknown.length){
+    html += "<span style='color:#b3541e;font-weight:bold'>⚠ 有 "+unknown.length+
+      " 個座位上的學生不在最新名單（可能已退學／轉班）："+unknown.join("、")+
+      "——請核實；可把新學生拖到該座取代，或把該座拖回「待入座學生」移除</span>";
+  }
   if(state.updatedAt){
     html += "<span>雲端最後更新："+state.updatedAt+(state.updatedBy?"（"+state.updatedBy+"）":"")+"</span>";
   }else{
@@ -588,7 +703,7 @@ function updateInfo(){
   }
   info.innerHTML = html;
   unseatedEl.textContent = missing.length
-    ? "⚠ 未排到座位的學生："+missing.join("、")+"（請增加行或列，橙色顯示於左側名單）" : "";
+    ? "⚠ 未排到座位的學生："+missing.join("、")+"（見左下「待入座學生」，可直接拖曳到空位）" : "";
 }
 
 /* ================= 門口 ================= */
@@ -836,6 +951,39 @@ $("resetBtn").addEventListener("click", ()=>{
 $("saveBtn").addEventListener("click", save);
 $("loadBtn").addEventListener("click", ()=>{ if(clsSel.value) loadClass(clsSel.value); });
 $("printBtn").addEventListener("click", ()=>window.print());
+
+/* 行數／列數即時調整：保留原有座位位置（不重新排列），
+   超出新範圍的學生自動列入左下「待入座學生」，方便插班加位 */
+function resizeKeep(rows, cols){
+  const old = state;
+  const seats = new Array(capacity(rows,cols)).fill(null);
+  for(let lr=0; lr<Math.min(old.rows,rows); lr++){
+    for(let c=0; c<Math.min(old.cols,cols); c++){
+      seats[lr*cols + c] = old.seats[lr*old.cols + c];
+    }
+  }
+  state.rows = rows; state.cols = cols; state.seats = seats;
+  dirty = true;
+  render();
+}
+rowsInp.addEventListener("change", ()=>{
+  if(!state) return;
+  const rows = Math.min(12, Math.max(1, +rowsInp.value||1));
+  rowsInp.value = rows;
+  if(rows !== state.rows){
+    resizeKeep(rows, state.cols);
+    toast("已改為 "+state.rows+" 行（原有座位保留，超出學生列入待入座）");
+  }
+});
+colsInp.addEventListener("change", ()=>{
+  if(!state) return;
+  const cols = Math.min(16, Math.max(1, +colsInp.value||1));
+  colsInp.value = cols;
+  if(cols !== state.cols){
+    resizeKeep(state.rows, cols);
+    toast("已改為每列 "+state.cols+" 座（原有座位保留，超出學生列入待入座）");
+  }
+});
 
 /* 列印前量度實際內容尺寸，放大／縮小至用盡整頁 A4 橫向 */
 function printScale(){
